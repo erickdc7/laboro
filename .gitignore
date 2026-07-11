@@ -1,0 +1,48 @@
+# ========================
+# Python / Backend
+# ========================
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Entorno virtual
+backend/venv/
+backend/.venv/
+backend/env/
+
+# Variables de entorno
+backend/.env
+.env
+
+# Base de datos local
+*.db
+*.sqlite3
+
+# Alembic (no ignorar las migraciones, solo esto)
+backend/alembic.ini
+
+# ========================
+# Node.js / Frontend
+# ========================
+node_modules/
+frontend/.next/
+frontend/out/
+frontend/build/
+frontend/.env
+frontend/.env.local
+frontend/.env.production
+
+# ========================
+# General
+# ========================
+.DS_Store
+Thumbs.db
+*.log
+.vscode/settings.json
+.idea/
