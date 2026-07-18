@@ -5,6 +5,7 @@ from app.database import get_db
 from app.models.source import Source
 from app.models.scrape_log import ScrapeLog
 from app.scrapers.computrabajo import ComputrabajoScraper
+from app.scrapers.bumeran import BumeranScraper
 from datetime import datetime, timezone
 
 router = APIRouter(prefix="/scraper", tags=["scraper"])
@@ -37,6 +38,7 @@ def run_scraper(
 
     scrapers = {
         "computrabajo": ComputrabajoScraper,
+        "bumeran": BumeranScraper, 
     }
 
     scraper_class = scrapers.get(source_name.lower())
