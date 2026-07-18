@@ -1,0 +1,141 @@
+import requests
+import time
+import random
+from bs4 import BeautifulSoup
+from datetime import datetime, timezone
+
+from app.scrapers.base import BaseScraper
+from app.scrapers.utils import clean_text, extract_technologies, parse_salary
+
+
+HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/120.0.0.0 Safari/537.36"
+    ),
+    "Accept-Language": "es-PE,es;q=0.9,en;q=0.8",
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    "Referer": "https://pe.computrabajo.com/",
+}
+
+SEARCH_URLS = [
+    "https://pe.computrabajo.com/trabajo-de-desarrollador-software",
+    "https://pe.computrabajo.com/trabajo-de-programador",
+    "https://pe.computrabajo.com/trabajo-de-react",
+    "https://pe.computrabajo.com/trabajo-de-python",
+]
+
+
+class ComputrabajoScraper(BaseScraper):
+
+    def fetch_jobs(self) -> list[dict]:
+        raw_jobs = []
+
+        for url in SEARCH_URLS:
+            try:
+                print(f"[Computrabajo] Scrapeando: {url}")
+                jobs_from_page = self._scrape_listing_page(url)
+                raw_jobs.extend(jobs_from_page)
+                time.sleep(random.uniform(2, 4))
+            except Exception as e:
+                print(f"[Computrabajo] Error en {url}: {e}")
+                continue
+
+        seen_urls = set()
+        unique_jobs = []
+        for job in raw_jobs:
+            if job["url_original"] not in seen_urls:
+                seen_urls.add(job["url_original"])
+                unique_jobs.append(job)
+
+        print(f"[Computrabajo] Total únicos encontrados: {len(unique_jobs)}")
+        return unique_jobs
+
+    def _scrape_listing_page(self, url: str) -> list[dict]:
+        response = requests.get(url, headers=HEADERS, timeout=15)
+        response.raise_for_status()
+
+        soup = BeautifulSoup(response.text, "lxml")
+        job_cards = soup.find_all("article", class_="box_offer")
+
+        if not job_cards:
+            job_cards = soup.find_all("div", class_="box_offer")
+
+        jobs = []
+        for card in job_cards:
+            try:
+                job_data = self._extract_card_data(card)
+                if job_data:
+                    jobs.append(job_data)
+            except Exception as e:
+                print(f"[Computrabajo] Error parseando card: {e}")
+                continue
+
+        return jobs
+
+    def _extract_card_data(self, card) -> dict | None:
+        title_tag = (
+            card.find("h2") or
+            card.find("a", class_="js-o-link") or
+            card.find("a", {"data-cy": "card-job-link"})
+        )
+        if not title_tag:
+            return None
+
+        title = clean_text(title_tag.get_text())
+        if not title:
+            return None
+
+        link_tag = card.find("a", href=True)
+        if not link_tag:
+            return None
+
+        href = link_tag["href"]
+        if not href.startswith("http"):
+            href = f"https://pe.computrabajo.com{href}"
+
+        company_tag = (
+            card.find("a", class_="fc_base") or
+            card.find("p", class_="fs16") or
+            card.find("span", class_="company")
+        )
+        company = clean_text(company_tag.get_text()) if company_tag else None
+
+        location_tag = (
+            card.find("span", class_="ubic") or
+            card.find("p", class_="fs13 fc_base mt5") or
+            card.find("span", attrs={"data-cy": "card-job-location"})
+        )
+        location = clean_text(location_tag.get_text()) if location_tag else "Lima"
+
+        salary_tag = card.find("span", class_="nbs")
+        salary_text = clean_text(salary_tag.get_text()) if salary_tag else ""
+        salary_min, salary_max = parse_salary(salary_text)
+
+        description_text = f"{title} {company or ''}"
+        technologies = extract_technologies(description_text)
+
+        return {
+            "title": title,
+            "company": company,
+            "description": None,
+            "location": location,
+            "modality": self._detect_modality(card),
+            "salary_min": salary_min,
+            "salary_max": salary_max,
+            "url_original": href,
+            "published_at": datetime.now(timezone.utc),
+            "technologies": technologies,
+        }
+
+    def _detect_modality(self, card) -> str:
+        text = card.get_text().lower()
+        if "remoto" in text or "remote" in text or "teletrabajo" in text:
+            return "remote"
+        elif "híbrido" in text or "hibrido" in text or "hybrid" in text:
+            return "hybrid"
+        return "on-site"
+
+    def parse_job(self, raw_data: dict) -> dict:
+        return raw_data
