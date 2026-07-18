@@ -1,9 +1,12 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
+from sqlalchemy import or_
+from typing import Optional
 import math
 
 from app.database import get_db
-from app.models.job import Job
+from app.models.job import Job, JobTechnology
+from app.models.source import Source
 from app.schemas.job import JobResponse, JobListResponse
 
 router = APIRouter(prefix="/jobs", tags=["jobs"])
@@ -13,17 +16,52 @@ router = APIRouter(prefix="/jobs", tags=["jobs"])
 def get_jobs(
     page: int = 1,
     per_page: int = 20,
+    stack: Optional[str] = Query(None, description="Tecnología requerida (ej: react, python)"),
+    modality: Optional[str] = Query(None, description="Modalidad: remote, hybrid, on-site"),
+    city: Optional[str] = Query(None, description="Ciudad (ej: lima)"),
+    source: Optional[str] = Query(None, description="Portal de origen (ej: computrabajo)"),
+    search: Optional[str] = Query(None, description="Búsqueda por texto en título y descripción"),
     db: Session = Depends(get_db)
 ):
+    query = db.query(Job).filter(Job.is_active == True)
+
+    if stack:
+        query = query.join(JobTechnology).filter(
+            JobTechnology.technology.ilike(f"%{stack}%")
+        )
+
+    if modality:
+        query = query.filter(Job.modality.ilike(f"%{modality}%"))
+
+    if city:
+        query = query.filter(Job.location.ilike(f"%{city}%"))
+
+    if source:
+        query = query.join(Source).filter(
+            Source.name.ilike(f"%{source}%")
+        )
+
+    if search:
+        query = query.filter(
+            or_(
+                Job.title.ilike(f"%{search}%"),
+                Job.description.ilike(f"%{search}%"),
+                Job.company.ilike(f"%{search}%")
+            )
+        )
+
+    query = query.distinct()
+
+    total = query.count()
     offset = (page - 1) * per_page
-    total = db.query(Job).filter(Job.is_active == True).count()
     jobs = (
-        db.query(Job)
-        .filter(Job.is_active == True)
+        query
+        .order_by(Job.scraped_at.desc())
         .offset(offset)
         .limit(per_page)
         .all()
     )
+
     return JobListResponse(
         data=jobs,
         total=total,
