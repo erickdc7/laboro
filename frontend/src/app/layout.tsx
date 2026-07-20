@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { QueryProvider } from "@/providers/query-provider";
+import { Navbar } from "@/components/layout/navbar";
+import { Footer } from "@/components/layout/footer";
 
 export const metadata: Metadata = {
   title: "Laboro — Empleos tech en Perú",
@@ -15,8 +17,12 @@ export default function RootLayout({
 }) {
   return (
     <html lang="es">
-      <body>
-        <QueryProvider>{children}</QueryProvider>
+      <body className="min-h-screen flex flex-col">
+        <QueryProvider>
+          <Navbar />
+          <main className="flex-1">{children}</main>
+          <Footer />
+        </QueryProvider>
       </body>
     </html>
   );
