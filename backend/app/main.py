@@ -39,7 +39,7 @@ app.include_router(scraper.router)
 app.include_router(stats.router)
 
 
-@app.get("/health", tags=["health"])
+@app.api_route("/health", methods=["GET", "HEAD"], tags=["health"])
 def health_check():
     return {
         "status": "ok",
