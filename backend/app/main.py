@@ -25,7 +25,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:3000",
-        "https://laboro.vercel.app",
+        "https://laboro-pe.vercel.app",
         "https://*.vercel.app",
     ],
     allow_credentials=True,
