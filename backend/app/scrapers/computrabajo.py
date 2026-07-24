@@ -7,7 +7,6 @@ from datetime import datetime, timezone
 from app.scrapers.base import BaseScraper
 from app.scrapers.utils import clean_text, extract_technologies, parse_salary
 
-
 HEADERS = {
     "User-Agent": (
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -76,14 +75,20 @@ class ComputrabajoScraper(BaseScraper):
 
     def _extract_card_data(self, card) -> dict | None:
         title_tag = (
-            card.find("h2") or
-            card.find("a", class_="js-o-link") or
-            card.find("a", {"data-cy": "card-job-link"})
+            card.find("h2")
+            or card.find("a", class_="js-o-link")
+            or card.find("a", {"data-cy": "card-job-link"})
         )
         if not title_tag:
             return None
 
         title = clean_text(title_tag.get_text())
+
+        # Limpiar sufijos que agrega Computrabajo al título
+        for suffix in [" Vista", " Postulado", " Nuevo", " Destacado"]:
+            if title.endswith(suffix):
+                title = title[: -len(suffix)].strip()
+
         if not title:
             return None
 
@@ -95,17 +100,38 @@ class ComputrabajoScraper(BaseScraper):
         if not href.startswith("http"):
             href = f"https://pe.computrabajo.com{href}"
 
+        # Buscar empresa con más selectores
         company_tag = (
-            card.find("a", class_="fc_base") or
-            card.find("p", class_="fs16") or
-            card.find("span", class_="company")
+            card.find("a", class_="fc_base")
+            or card.find("p", class_="fs16")
+            or card.find("span", class_="company")
+            or card.find("a", {"data-cy": "card-job-company"})
+            or card.find("p", class_="dIB fs16 fc_base mt5")
+            or card.find("span", class_="fc_base t_ellipsis")
         )
-        company = clean_text(company_tag.get_text()) if company_tag else None
+
+        # Si no encontró empresa con selectores, buscar el segundo texto prominente
+        if not company_tag:
+            texts = [
+                p
+                for p in card.find_all(["p", "span", "a"])
+                if p.get_text(strip=True)
+                and p.get_text(strip=True) != title
+                and len(p.get_text(strip=True)) > 2
+                and len(p.get_text(strip=True)) < 80
+            ]
+            company = clean_text(texts[0].get_text()) if texts else None
+        else:
+            company = clean_text(company_tag.get_text())
+
+        # Verificar que la empresa no sea igual al título
+        if company and company == title:
+            company = None
 
         location_tag = (
-            card.find("span", class_="ubic") or
-            card.find("p", class_="fs13 fc_base mt5") or
-            card.find("span", attrs={"data-cy": "card-job-location"})
+            card.find("span", class_="ubic")
+            or card.find("p", class_="fs13 fc_base mt5")
+            or card.find("span", attrs={"data-cy": "card-job-location"})
         )
         location = clean_text(location_tag.get_text()) if location_tag else "Lima"
 
