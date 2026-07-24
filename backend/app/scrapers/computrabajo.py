@@ -66,7 +66,22 @@ class ComputrabajoScraper(BaseScraper):
             try:
                 job_data = self._extract_card_data(card)
                 if job_data:
+                    # Entrar al detalle para obtener empresa, ubicación y descripción
+                    print(
+                        f"[Computrabajo] Scrapeando detalle: {job_data['url_original']}"
+                    )
+                    detail = self._scrape_job_detail(job_data["url_original"])
+
+                    # Sobrescribir con datos del detalle si son más precisos
+                    if detail["company"]:
+                        job_data["company"] = detail["company"]
+                    if detail["location"]:
+                        job_data["location"] = detail["location"]
+                    if detail["description"]:
+                        job_data["description"] = detail["description"]
+
                     jobs.append(job_data)
+                    time.sleep(random.uniform(1, 2))
             except Exception as e:
                 print(f"[Computrabajo] Error parseando card: {e}")
                 continue
@@ -162,6 +177,51 @@ class ComputrabajoScraper(BaseScraper):
         elif "híbrido" in text or "hibrido" in text or "hybrid" in text:
             return "hybrid"
         return "on-site"
+
+    def _scrape_job_detail(self, url: str) -> dict:
+        try:
+            response = requests.get(url, headers=HEADERS, timeout=15)
+            response.raise_for_status()
+            soup = BeautifulSoup(response.text, "lxml")
+
+            # Empresa — buscar en el panel derecho del detalle
+            company = None
+            company_tag = (
+                soup.find("a", class_="dIB fs16 js-o-link")
+                or soup.find("a", class_="js-o-link fs16")
+                or soup.find("a", class_="fc_base t_ellipsis dIB")
+            )
+            if company_tag:
+                company = clean_text(company_tag.get_text())
+
+            # Ubicación
+            location = None
+            location_candidates = soup.find_all("p", class_="fs16")
+            for p in location_candidates:
+                text = clean_text(p.get_text())
+                if text and len(text) > 3 and text != company:
+                    location = text
+                    break
+
+            # Descripción completa
+            description = None
+            desc_tag = (
+                soup.find("div", class_="description_offer")
+                or soup.find("section", class_="box_border")
+                or soup.find("div", {"id": "description_offer"})
+                or soup.find("div", class_="offer-description")
+            )
+            if desc_tag:
+                description = clean_text(desc_tag.get_text())
+
+            return {
+                "company": company,
+                "location": location,
+                "description": description,
+            }
+        except Exception as e:
+            print(f"[Computrabajo] Error scrapeando detalle {url}: {e}")
+            return {"company": None, "location": None, "description": None}
 
     def parse_job(self, raw_data: dict) -> dict:
         return raw_data
