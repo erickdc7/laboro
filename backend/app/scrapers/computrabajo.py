@@ -160,7 +160,7 @@ class ComputrabajoScraper(BaseScraper):
 
             result = {}
 
-            # Título — exactamente el selector que me pasaste
+            # Título
             title_tag = soup.find("p", class_=lambda c: c and "title_offer" in c)
             if title_tag:
                 title = clean_text(title_tag.get_text())
@@ -169,32 +169,43 @@ class ComputrabajoScraper(BaseScraper):
                         title = title[: -len(suffix)].strip()
                 result["title"] = title
 
-            # Empresa — exactamente el selector que me pasaste
-            company_tag = soup.find("a", class_="dIB mr10")
-            if not company_tag:
-                company_tag = soup.find(
-                    "a", class_=lambda c: c and "dIB" in c and "mr10" in c
-                )
+            # Empresa — selector correcto del HTML real
+            # <a class="dIB fs16 js-o-link" href="/empresas/...">NOMBRE</a>
+            company_tag = soup.find(
+                "a",
+                class_=lambda c: c and "dIB" in c and "fs16" in c and "js-o-link" in c,
+                href=lambda h: h and "/empresas/" in h,
+            )
             if company_tag:
                 company = clean_text(company_tag.get_text())
                 if company and len(company) > 1:
                     result["company"] = company
 
-            # Ubicación — exactamente p.fs16.mb5
-            location_tag = soup.find("p", class_="fs16 mb5")
-            if location_tag:
-                location = clean_text(location_tag.get_text())
-                # Verificar que es una ubicación real y no texto genérico
-                generic_texts = [
-                    "las mejores empresas",
-                    "portal de empleo",
-                    "bolsa de trabajo",
-                    "ofertas de trabajo",
-                ]
-                if location and not any(g in location.lower() for g in generic_texts):
-                    result["location"] = location
+            # Ubicación — selector correcto del HTML real
+            # <p class="fs16">Santiago De Surco, Lima</p>
+            # Buscar dentro del div.box_border para mayor precisión
+            box_border = soup.find("div", class_="box_border")
+            if box_border:
+                for p in box_border.find_all("p", class_="fs16"):
+                    text = clean_text(p.get_text())
+                    generic_texts = [
+                        "las mejores empresas",
+                        "portal de empleo",
+                        "bolsa de trabajo",
+                        "ofertas de trabajo",
+                        "empresa verificada",
+                    ]
+                    if (
+                        text
+                        and len(text) > 3
+                        and len(text) < 80
+                        and not any(g in text.lower() for g in generic_texts)
+                        and text != result.get("company", "")
+                    ):
+                        result["location"] = text
+                        break
 
-            # Modalidad — exactamente p.dFlex.mb10
+            # Modalidad
             modality_tag = soup.find("p", class_="dFlex mb10")
             if modality_tag:
                 modality_text = clean_text(modality_tag.get_text()).lower()
@@ -205,7 +216,7 @@ class ComputrabajoScraper(BaseScraper):
                 else:
                     result["modality"] = "on-site"
 
-            # Descripción — exactamente div.fs16.t_word_wrap
+            # Descripción
             desc_tag = soup.find("div", class_="fs16 t_word_wrap")
             if desc_tag:
                 description = clean_text(desc_tag.get_text())
