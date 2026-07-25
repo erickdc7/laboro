@@ -82,8 +82,9 @@ class ComputrabajoScraper(BaseScraper):
         return unique_jobs
 
     def _scrape_listing_page(self, url: str) -> list[dict]:
-        # Limpiar parámetros y fragmentos de la URL
-        href = href.split("#")[0].split("?")[0]
+        href = link_tag["href"]
+        # Limpiar fragmentos y parámetros
+        href = href.split("#")[0].split("?")[0].strip()
         if not href.startswith("http"):
             href = f"https://pe.computrabajo.com{href}"
 
@@ -181,29 +182,36 @@ class ComputrabajoScraper(BaseScraper):
                 if company and len(company) > 1:
                     result["company"] = company
 
-            # Ubicación — selector correcto del HTML real
-            # <p class="fs16">Santiago De Surco, Lima</p>
-            # Buscar dentro del div.box_border para mayor precisión
+            # Ubicación — buscar dentro de box_border con validación estricta
+            location = None
             box_border = soup.find("div", class_="box_border")
             if box_border:
-                for p in box_border.find_all("p", class_="fs16"):
-                    text = clean_text(p.get_text())
-                    generic_texts = [
-                        "las mejores empresas",
-                        "portal de empleo",
-                        "bolsa de trabajo",
-                        "ofertas de trabajo",
-                        "empresa verificada",
-                    ]
-                    if (
-                        text
-                        and len(text) > 3
-                        and len(text) < 80
-                        and not any(g in text.lower() for g in generic_texts)
-                        and text != result.get("company", "")
-                    ):
-                        result["location"] = text
-                        break
+                # La ubicación siempre es el p.fs16 que viene DESPUÉS del título
+                # y ANTES del div de salario — tiene formato "Distrito, Lima"
+                title_p = box_border.find(
+                    "p", class_=lambda c: c and "fwB" in c and "fs18" in c
+                )
+                if title_p:
+                    # Buscar el siguiente p.fs16 después del título
+                    next_sibling = title_p.find_next_sibling("p", class_="fs16")
+                    if next_sibling:
+                        text = clean_text(next_sibling.get_text())
+                        generic_texts = [
+                            "las mejores empresas",
+                            "portal de empleo",
+                            "bolsa de trabajo",
+                            "ofertas de trabajo",
+                        ]
+                        if (
+                            text
+                            and len(text) > 3
+                            and len(text) < 80
+                            and not any(g in text.lower() for g in generic_texts)
+                        ):
+                            location = text
+
+            if location:
+                result["location"] = location
 
             # Modalidad
             modality_tag = soup.find("p", class_="dFlex mb10")
