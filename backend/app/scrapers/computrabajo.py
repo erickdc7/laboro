@@ -86,19 +86,13 @@ class ComputrabajoScraper(BaseScraper):
         response.raise_for_status()
         soup = BeautifulSoup(response.text, "lxml")
 
-        # Cards del lado izquierdo
         left_cards = soup.find_all("article", class_="box_offer")
         if not left_cards:
             left_cards = soup.find_all("div", class_="box_offer")
 
-        # Panel derecho — detalle del primer empleo visible
-        # Computrabajo carga los detalles de cada oferta en divs ocultos
-        detail_panels = soup.find_all("div", class_="box_border")
-
         jobs = []
-        for i, card in enumerate(left_cards):
+        for card in left_cards:
             try:
-                # Extraer URL y fecha relativa del card izquierdo
                 link_tag = card.find("a", href=True)
                 if not link_tag:
                     continue
@@ -107,54 +101,36 @@ class ComputrabajoScraper(BaseScraper):
                 if not href.startswith("http"):
                     href = f"https://pe.computrabajo.com{href}"
 
-                # Fecha relativa del card
+                # Fecha relativa del card izquierdo
                 date_tag = card.find("p", class_="fs13 fc_aux mt15")
                 published_at = None
                 if date_tag:
-                    date_text = clean_text(date_tag.get_text())
-                    published_at = parse_relative_date(date_text)
+                    published_at = parse_relative_date(clean_text(date_tag.get_text()))
 
-                # Limpiar sufijos del título en el card
-                title_tag = card.find("h2") or card.find("p", class_="title_offer")
-                title_from_card = ""
-                if title_tag:
-                    title_from_card = clean_text(title_tag.get_text())
-                    for suffix in [" Vista", " Postulado", " Nuevo", " Destacado"]:
-                        if title_from_card.endswith(suffix):
-                            title_from_card = title_from_card[: -len(suffix)].strip()
-
-                # Extraer datos del panel derecho correspondiente
-                detail_data = {}
-                if i < len(detail_panels):
-                    detail_data = self._extract_from_detail_panel(detail_panels[i])
-
-                # Usar título del detalle si existe, sino del card
-                title = detail_data.get("title") or title_from_card
-                if not title:
-                    continue
-
-                company = detail_data.get("company")
-                location = detail_data.get("location")
-                modality = detail_data.get("modality") or self._detect_modality_text(
-                    card.get_text()
-                )
-                description = detail_data.get("description")
-
+                # Salario del card izquierdo
                 salary_tag = card.find("span", class_="nbs")
                 salary_text = clean_text(salary_tag.get_text()) if salary_tag else ""
                 salary_min, salary_max = parse_salary(salary_text)
 
-                # Detectar tecnologías del título + descripción
-                tech_text = f"{title} {description or ''}"
+                # Entrar al detalle de cada empleo
+                print(f"[Computrabajo] Detalle: {href}")
+                detail = self._scrape_job_detail(href)
+
+                if not detail.get("title"):
+                    continue
+
+                tech_text = (
+                    f"{detail.get('title', '')} {detail.get('description', '') or ''}"
+                )
                 technologies = extract_technologies(tech_text)
 
                 jobs.append(
                     {
-                        "title": title,
-                        "company": company,
-                        "description": description,
-                        "location": location,
-                        "modality": modality,
+                        "title": detail["title"],
+                        "company": detail.get("company"),
+                        "description": detail.get("description"),
+                        "location": detail.get("location"),
+                        "modality": detail.get("modality") or "on-site",
                         "salary_min": salary_min,
                         "salary_max": salary_max,
                         "url_original": href,
@@ -163,11 +139,79 @@ class ComputrabajoScraper(BaseScraper):
                     }
                 )
 
+                time.sleep(random.uniform(1.5, 3))
+
             except Exception as e:
-                print(f"[Computrabajo] Error parseando card {i}: {e}")
+                print(f"[Computrabajo] Error: {e}")
                 continue
 
         return jobs
+
+    def _scrape_job_detail(self, url: str) -> dict:
+        try:
+            response = requests.get(url, headers=HEADERS, timeout=15)
+            response.raise_for_status()
+            soup = BeautifulSoup(response.text, "lxml")
+
+            result = {}
+
+            # Título — exactamente el selector que me pasaste
+            title_tag = soup.find("p", class_=lambda c: c and "title_offer" in c)
+            if title_tag:
+                title = clean_text(title_tag.get_text())
+                for suffix in [" Vista", " Postulado", " Nuevo", " Destacado"]:
+                    if title.endswith(suffix):
+                        title = title[: -len(suffix)].strip()
+                result["title"] = title
+
+            # Empresa — exactamente el selector que me pasaste
+            company_tag = soup.find("a", class_="dIB mr10")
+            if not company_tag:
+                company_tag = soup.find(
+                    "a", class_=lambda c: c and "dIB" in c and "mr10" in c
+                )
+            if company_tag:
+                company = clean_text(company_tag.get_text())
+                if company and len(company) > 1:
+                    result["company"] = company
+
+            # Ubicación — exactamente p.fs16.mb5
+            location_tag = soup.find("p", class_="fs16 mb5")
+            if location_tag:
+                location = clean_text(location_tag.get_text())
+                # Verificar que es una ubicación real y no texto genérico
+                generic_texts = [
+                    "las mejores empresas",
+                    "portal de empleo",
+                    "bolsa de trabajo",
+                    "ofertas de trabajo",
+                ]
+                if location and not any(g in location.lower() for g in generic_texts):
+                    result["location"] = location
+
+            # Modalidad — exactamente p.dFlex.mb10
+            modality_tag = soup.find("p", class_="dFlex mb10")
+            if modality_tag:
+                modality_text = clean_text(modality_tag.get_text()).lower()
+                if "remoto" in modality_text:
+                    result["modality"] = "remote"
+                elif "híbrido" in modality_text or "hibrido" in modality_text:
+                    result["modality"] = "hybrid"
+                else:
+                    result["modality"] = "on-site"
+
+            # Descripción — exactamente div.fs16.t_word_wrap
+            desc_tag = soup.find("div", class_="fs16 t_word_wrap")
+            if desc_tag:
+                description = clean_text(desc_tag.get_text())
+                if description and len(description) > 50:
+                    result["description"] = description
+
+            return result
+
+        except Exception as e:
+            print(f"[Computrabajo] Error en detalle {url}: {e}")
+            return {}
 
     def _extract_from_detail_panel(self, panel) -> dict:
         result = {}
