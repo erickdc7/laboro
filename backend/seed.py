@@ -5,9 +5,10 @@ from datetime import datetime, timezone
 
 db = SessionLocal()
 
-# Limpiar datos previos
+# Limpiar en orden correcto — primero las tablas dependientes
 db.query(JobTechnology).delete()
 db.query(Job).delete()
+db.query(ScrapeLog).delete()  # ← agrega esta línea
 db.query(Source).delete()
 db.commit()
 

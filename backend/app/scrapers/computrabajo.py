@@ -82,6 +82,11 @@ class ComputrabajoScraper(BaseScraper):
         return unique_jobs
 
     def _scrape_listing_page(self, url: str) -> list[dict]:
+        # Limpiar parámetros y fragmentos de la URL
+        href = href.split("#")[0].split("?")[0]
+        if not href.startswith("http"):
+            href = f"https://pe.computrabajo.com{href}"
+
         response = requests.get(url, headers=HEADERS, timeout=15)
         response.raise_for_status()
         soup = BeautifulSoup(response.text, "lxml")
