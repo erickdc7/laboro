@@ -115,12 +115,6 @@ class ComputrabajoScraper(BaseScraper):
 
                 detail = self._scrape_job_detail(href)
 
-                # Debug — ver qué devuelve el detalle
-                print(f"[Computrabajo] Card {i} detail keys: {list(detail.keys())}")
-                print(f"[Computrabajo] Card {i} title: {detail.get('title')}")
-                print(f"[Computrabajo] Card {i} company: {detail.get('company')}")
-                print(f"[Computrabajo] Card {i} location: {detail.get('location')}")
-
                 if not detail.get("title"):
                     print(f"[Computrabajo] Card {i}: sin título, saltando")
                     continue
@@ -162,7 +156,7 @@ class ComputrabajoScraper(BaseScraper):
 
             result = {}
 
-            # Título — h1.fwB.fs24.mb5.box_detail
+            # Título — h1.box_detail
             title_tag = soup.find("h1", class_=lambda c: c and "box_detail" in c)
             if title_tag:
                 title = clean_text(title_tag.get_text())
@@ -171,62 +165,81 @@ class ComputrabajoScraper(BaseScraper):
                         title = title[: -len(suffix)].strip()
                 result["title"] = title
 
-            # Empresa — a con href /empresas/ dentro de info_company
-            info_company = soup.find("div", class_=lambda c: c and "info_company" in c)
-            if info_company:
-                company_tag = info_company.find(
-                    "a", href=lambda h: h and "/empresas/" in h
-                )
-                if not company_tag:
-                    company_tag = info_company.find(
-                        "a", class_=lambda c: c and "js-o-link" in c
-                    )
-                if company_tag:
-                    company = clean_text(company_tag.get_text())
-                    if company and len(company) > 1:
-                        result["company"] = company
+                # Empresa + Ubicación — SIEMPRE están juntas en el <p class="fs16">
+                # que viene justo después del <h1>, formato "Empresa - Ubicación"
+                info_p = title_tag.find_next_sibling("p", class_="fs16")
+                if info_p:
+                    info_text = clean_text(info_p.get_text())
+                    if " - " in info_text:
+                        company_part, location_part = info_text.split(" - ", 1)
+                        company_part = company_part.strip()
+                        location_part = location_part.strip()
+                        if company_part:
+                            result["company"] = company_part
+                        if location_part:
+                            result["location"] = location_part
+                    elif info_text:
+                        result["location"] = info_text
 
-            # Ubicación — p.fwB.fs18 seguido de p.fs16
-            # Del debug: p.['fwB', 'fs18']: Líder técnico...
-            #            p.['fs16']: Miraflores, Lima
-            title_p = soup.find("p", class_=lambda c: c and "fwB" in c and "fs18" in c)
-            if title_p:
-                next_p = title_p.find_next_sibling("p", class_="fs16")
-                if next_p:
-                    text = clean_text(next_p.get_text())
-                    generic = [
-                        "las mejores empresas",
-                        "portal de empleo",
-                        "bolsa de trabajo",
-                        "conoce los salarios",
-                        "únete a nosotros",
-                    ]
-                    if (
-                        text
-                        and 3 < len(text) < 80
-                        and not any(g in text.lower() for g in generic)
-                    ):
-                        result["location"] = text
+            # Fallback — solo si algo faltó, busca en el panel lateral box_border
+            if not result.get("company") or not result.get("location"):
+                box_resume = soup.find("div", class_=lambda c: c and "box_resume" in c)
+                if box_resume:
+                    box_border = box_resume.find("div", class_="box_border")
+                    if box_border:
+                        if not result.get("company"):
+                            company_tag = box_border.find(
+                                "a",
+                                class_=lambda c: (
+                                    c
+                                    and "dIB" in c
+                                    and "fs16" in c
+                                    and "js-o-link" in c
+                                ),
+                            )
+                            if company_tag:
+                                company = clean_text(company_tag.get_text())
+                                if company:
+                                    result["company"] = company
 
-            # Modalidad — buscar texto remoto/híbrido en la descripción
+                        if not result.get("location"):
+                            sidebar_title = box_border.find(
+                                "p", class_=lambda c: c and "fwB" in c and "fs18" in c
+                            )
+                            if sidebar_title:
+                                loc_p = sidebar_title.find_next_sibling(
+                                    "p", class_="fs16"
+                                )
+                                if loc_p:
+                                    location = clean_text(loc_p.get_text())
+                                    if location:
+                                        result["location"] = location
+
+            # Modalidad
             full_text = soup.get_text().lower()
             if (
                 "modalidad: remota" in full_text
-                or "trabajo remoto" in full_text
                 or "100% remoto" in full_text
+                or "trabajo remoto" in full_text
             ):
                 result["modality"] = "remote"
-            elif "híbrido" in full_text or "hibrido" in full_text:
+            elif (
+                "híbrido" in full_text
+                or "hibrido" in full_text
+                or "presencial y remoto" in full_text
+            ):
                 result["modality"] = "hybrid"
             else:
                 result["modality"] = "on-site"
 
-            # Descripción
-            desc_tag = soup.find("div", class_="fs16 t_word_wrap")
-            if desc_tag:
-                description = clean_text(desc_tag.get_text())
-                if description and len(description) > 50:
-                    result["description"] = description
+            # Descripción — dentro del div "oferta", el primer p.mbB
+            oferta_div = soup.find("div", attrs={"div-link": "oferta"})
+            if oferta_div:
+                desc_p = oferta_div.find("p", class_="mbB")
+                if desc_p:
+                    description = clean_text(desc_p.get_text())
+                    if description and len(description) > 50:
+                        result["description"] = description
 
             return result
 
