@@ -82,12 +82,6 @@ class ComputrabajoScraper(BaseScraper):
         return unique_jobs
 
     def _scrape_listing_page(self, url: str) -> list[dict]:
-        href = link_tag["href"]
-        # Limpiar fragmentos y parámetros
-        href = href.split("#")[0].split("?")[0].strip()
-        if not href.startswith("http"):
-            href = f"https://pe.computrabajo.com{href}"
-
         response = requests.get(url, headers=HEADERS, timeout=15)
         response.raise_for_status()
         soup = BeautifulSoup(response.text, "lxml")
@@ -104,21 +98,19 @@ class ComputrabajoScraper(BaseScraper):
                     continue
 
                 href = link_tag["href"]
+                href = href.split("#")[0].split("?")[0].strip()
                 if not href.startswith("http"):
                     href = f"https://pe.computrabajo.com{href}"
 
-                # Fecha relativa del card izquierdo
                 date_tag = card.find("p", class_="fs13 fc_aux mt15")
                 published_at = None
                 if date_tag:
                     published_at = parse_relative_date(clean_text(date_tag.get_text()))
 
-                # Salario del card izquierdo
                 salary_tag = card.find("span", class_="nbs")
                 salary_text = clean_text(salary_tag.get_text()) if salary_tag else ""
                 salary_min, salary_max = parse_salary(salary_text)
 
-                # Entrar al detalle de cada empleo
                 print(f"[Computrabajo] Detalle: {href}")
                 detail = self._scrape_job_detail(href)
 
@@ -170,8 +162,7 @@ class ComputrabajoScraper(BaseScraper):
                         title = title[: -len(suffix)].strip()
                 result["title"] = title
 
-            # Empresa — selector correcto del HTML real
-            # <a class="dIB fs16 js-o-link" href="/empresas/...">NOMBRE</a>
+            # Empresa
             company_tag = soup.find(
                 "a",
                 class_=lambda c: c and "dIB" in c and "fs16" in c and "js-o-link" in c,
@@ -182,21 +173,17 @@ class ComputrabajoScraper(BaseScraper):
                 if company and len(company) > 1:
                     result["company"] = company
 
-            # Ubicación — buscar dentro de box_border con validación estricta
-            location = None
+            # Ubicación — siempre viene después del título p.fwB.fs18
             box_border = soup.find("div", class_="box_border")
             if box_border:
-                # La ubicación siempre es el p.fs16 que viene DESPUÉS del título
-                # y ANTES del div de salario — tiene formato "Distrito, Lima"
                 title_p = box_border.find(
                     "p", class_=lambda c: c and "fwB" in c and "fs18" in c
                 )
                 if title_p:
-                    # Buscar el siguiente p.fs16 después del título
-                    next_sibling = title_p.find_next_sibling("p", class_="fs16")
-                    if next_sibling:
-                        text = clean_text(next_sibling.get_text())
-                        generic_texts = [
+                    next_p = title_p.find_next_sibling("p", class_="fs16")
+                    if next_p:
+                        text = clean_text(next_p.get_text())
+                        generic = [
                             "las mejores empresas",
                             "portal de empleo",
                             "bolsa de trabajo",
@@ -204,14 +191,10 @@ class ComputrabajoScraper(BaseScraper):
                         ]
                         if (
                             text
-                            and len(text) > 3
-                            and len(text) < 80
-                            and not any(g in text.lower() for g in generic_texts)
+                            and 3 < len(text) < 80
+                            and not any(g in text.lower() for g in generic)
                         ):
-                            location = text
-
-            if location:
-                result["location"] = location
+                            result["location"] = text
 
             # Modalidad
             modality_tag = soup.find("p", class_="dFlex mb10")
@@ -236,79 +219,6 @@ class ComputrabajoScraper(BaseScraper):
         except Exception as e:
             print(f"[Computrabajo] Error en detalle {url}: {e}")
             return {}
-
-    def _extract_from_detail_panel(self, panel) -> dict:
-        result = {}
-
-        # Título
-        title_tag = (
-            panel.find("p", class_=lambda c: c and "title_offer" in c)
-            or panel.find("h1")
-            or panel.find("p", class_="fs21 fwB lh1_2")
-        )
-        if title_tag:
-            title = clean_text(title_tag.get_text())
-            for suffix in [" Vista", " Postulado", " Nuevo", " Destacado"]:
-                if title.endswith(suffix):
-                    title = title[: -len(suffix)].strip()
-            result["title"] = title
-
-        # Empresa — buscar link con clase específica dentro del panel
-        company_tag = (
-            panel.find("a", class_=lambda c: c and "dIB" in c and "mr10" in c)
-            or panel.find("a", class_="dIB mr10")
-            or panel.find("a", class_="dIB fs16 js-o-link")
-        )
-        if company_tag:
-            company = clean_text(company_tag.get_text())
-            if company and len(company) > 1:
-                result["company"] = company
-
-        # Ubicación — buscar p.fs16.mb5 específicamente
-        location_tag = panel.find("p", class_="fs16 mb5")
-        if location_tag:
-            location = clean_text(location_tag.get_text())
-            if location and len(location) > 2:
-                result["location"] = location
-        else:
-            # Fallback: buscar p.fs16 que contenga Lima o un distrito
-            for p in panel.find_all("p", class_="fs16"):
-                text = clean_text(p.get_text())
-                if text and ("lima" in text.lower() or "," in text) and len(text) < 60:
-                    result["location"] = text
-                    break
-
-        # Modalidad
-        modality_tag = panel.find("p", class_="dFlex mb10")
-        if modality_tag:
-            modality_text = clean_text(modality_tag.get_text()).lower()
-            if "remoto" in modality_text:
-                result["modality"] = "remote"
-            elif "híbrido" in modality_text or "hibrido" in modality_text:
-                result["modality"] = "hybrid"
-            else:
-                result["modality"] = "on-site"
-
-        # Descripción
-        desc_tag = (
-            panel.find("div", class_="fs16 t_word_wrap")
-            or panel.find("div", class_="description_offer")
-            or panel.find("div", {"id": "description_offer"})
-        )
-        if desc_tag:
-            description = clean_text(desc_tag.get_text())
-            if description and len(description) > 50:
-                result["description"] = description
-
-        return result
-
-    def _detect_modality_text(self, text: str) -> str:
-        text = text.lower()
-        if "remoto" in text or "remote" in text or "teletrabajo" in text:
-            return "remote"
-        elif "híbrido" in text or "hibrido" in text or "hybrid" in text:
-            return "hybrid"
-        return "on-site"
 
     def parse_job(self, raw_data: dict) -> dict:
         return raw_data
