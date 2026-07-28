@@ -1,8 +1,9 @@
 import Link from "next/link";
-import { MapPin, Banknote } from "lucide-react";
+import { MapPin } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { ModalityBadge } from "./modality-badge";
 import { TechBadge } from "./tech-badge";
+import { SourceLogo } from "./source-logo";
 
 interface JobTechnology {
     id: number;
@@ -15,13 +16,21 @@ interface Job {
     company: string | null;
     location: string | null;
     modality: string | null;
-    salary_min: number | null;
-    salary_max: number | null;
     scraped_at: string;
     published_at: string | null;
     technologies: JobTechnology[];
     source_id: number;
 }
+
+interface JobCardProps {
+    job: Job;
+    variant?: "row" | "grid";
+}
+
+const SOURCE_MAP: Record<number, { key: "computrabajo" | "bumeran"; label: string }> = {
+    1: { key: "computrabajo", label: "Computrabajo" },
+    2: { key: "bumeran", label: "Bumeran" },
+};
 
 function timeAgo(dateStr: string): string {
     const date = new Date(dateStr);
@@ -42,96 +51,104 @@ function isNew(dateStr: string): boolean {
     return now.getTime() - date.getTime() < 1000 * 60 * 60 * 24;
 }
 
-function formatSalary(min: number | null, max: number | null): string | null {
-    if (!min && !max) return null;
-    if (min && max) return `S/ ${min.toLocaleString()} - ${max.toLocaleString()}`;
-    if (min) return `Desde S/ ${min.toLocaleString()}`;
-    return null;
-}
-
-const SOURCE_LABELS: Record<number, { label: string; abbr: string; color: string }> = {
-    1: { label: "Computrabajo", abbr: "CT", color: "#e65c1c" },
-    2: { label: "Bumeran", abbr: "BU", color: "#5b21b6" },
-};
-
-interface JobCardProps {
-    job: Job;
-}
-
-export function JobCard({ job }: JobCardProps) {
-    const salary = formatSalary(job.salary_min, job.salary_max);
+export function JobCard({ job, variant = "row" }: JobCardProps) {
     const dateStr = job.scraped_at;
     const jobIsNew = isNew(dateStr);
-    const source = SOURCE_LABELS[job.source_id];
-    const maxTechs = 4;
+    const source = SOURCE_MAP[job.source_id];
+    const maxTechs = variant === "row" ? 4 : 3;
     const visibleTechs = job.technologies.slice(0, maxTechs);
     const extraTechs = job.technologies.length - maxTechs;
+
+    const techRow = (
+        <div className="flex flex-wrap gap-1.5 mt-3">
+            {visibleTechs.map((tech) => (
+                <TechBadge key={tech.id} technology={tech.technology} />
+            ))}
+            {extraTechs > 0 && (
+                <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-secondary text-muted-foreground">
+                    +{extraTechs}
+                </span>
+            )}
+        </div>
+    );
+
+    if (variant === "grid") {
+        return (
+            <Link href={`/jobs/${job.id}`}>
+                <Card className="p-5 h-full flex flex-col hover:border-primary/40 hover:shadow-card transition-all cursor-pointer group">
+                    <div className="flex items-center justify-between gap-2">
+                        {job.modality && <ModalityBadge modality={job.modality} />}
+                        <span className="text-xs text-muted-foreground whitespace-nowrap">
+                            {timeAgo(dateStr)}
+                        </span>
+                    </div>
+
+                    <h3 className="text-base font-semibold text-foreground group-hover:text-primary transition-colors mt-3 line-clamp-2">
+                        {job.title}
+                    </h3>
+
+                    {job.company && (
+                        <p className="text-sm text-muted-foreground mt-0.5 truncate">
+                            {job.company}
+                        </p>
+                    )}
+
+                    {techRow}
+
+                    <div className="flex items-center justify-between mt-4 pt-3 border-t border-border">
+                        {job.location ? (
+                            <span className="flex items-center gap-1 text-xs text-muted-foreground truncate">
+                                <MapPin className="w-3 h-3 flex-shrink-0" />
+                                {job.location}
+                            </span>
+                        ) : (
+                            <span />
+                        )}
+                        {source && (
+                            <SourceLogo source={source.key} className="h-3.5 w-auto flex-shrink-0" />
+                        )}
+                    </div>
+                </Card>
+            </Link>
+        );
+    }
 
     return (
         <Link href={`/jobs/${job.id}`}>
             <Card className="p-5 hover:border-primary/40 hover:shadow-card transition-all cursor-pointer group">
                 <div className="flex items-start justify-between gap-4">
-                    <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap mb-1">
-                            {job.modality && <ModalityBadge modality={job.modality} />}
-                            {jobIsNew && (
-                                <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold bg-primary text-primary-foreground shadow-sm">
-                                    Nuevo
-                                </span>
-                            )}
-                        </div>
-
-                        <h3 className="text-base font-semibold text-foreground group-hover:text-primary transition-colors truncate">
+                    <div className="flex items-center gap-2 flex-wrap">
+                        <h3 className="text-base font-semibold text-foreground group-hover:text-primary transition-colors">
                             {job.title}
                         </h3>
-
-                        {job.company && (
-                            <p className="text-sm text-muted-foreground mt-0.5">
-                                {job.company}
-                            </p>
+                        {jobIsNew && (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold bg-primary text-primary-foreground shadow-sm">
+                                Nuevo
+                            </span>
                         )}
-
-                        <div className="flex flex-wrap gap-1.5 mt-3">
-                            {visibleTechs.map((tech) => (
-                                <TechBadge key={tech.id} technology={tech.technology} />
-                            ))}
-                            {extraTechs > 0 && (
-                                <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-secondary text-muted-foreground">
-                                    +{extraTechs}
-                                </span>
-                            )}
-                        </div>
                     </div>
-
-                    <p className="text-xs text-muted-foreground whitespace-nowrap mt-1">
-                        {timeAgo(dateStr)}
-                    </p>
+                    {job.modality && <ModalityBadge modality={job.modality} />}
                 </div>
 
-                <div className="flex items-center gap-4 mt-4 pt-3 border-t border-border">
-                    {job.location && (
-                        <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                            <MapPin className="w-3 h-3" />
-                            {job.location}
-                        </span>
-                    )}
-                    {salary && (
-                        <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                            <Banknote className="w-3 h-3" />
-                            {salary}
-                        </span>
-                    )}
-                    {source && (
-                        <span className="flex items-center gap-1.5 text-xs text-muted-foreground ml-auto">
-                            <span
-                                className="w-5 h-5 rounded-sm flex items-center justify-center text-white font-mono font-bold text-xs"
-                                style={{ backgroundColor: source.color }}
-                            >
-                                {source.abbr}
+                {job.company && (
+                    <p className="text-sm text-muted-foreground mt-0.5">{job.company}</p>
+                )}
+
+                {techRow}
+
+                <div className="flex items-center justify-between mt-4 pt-3 border-t border-border">
+                    <div className="flex items-center gap-3">
+                        {job.location && (
+                            <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                                <MapPin className="w-3 h-3" />
+                                {job.location}
                             </span>
-                            {source.label}
-                        </span>
-                    )}
+                        )}
+                        {source && <SourceLogo source={source.key} />}
+                    </div>
+                    <span className="text-xs text-muted-foreground whitespace-nowrap">
+                        {timeAgo(dateStr)}
+                    </span>
                 </div>
             </Card>
         </Link>
