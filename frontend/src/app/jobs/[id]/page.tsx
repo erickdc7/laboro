@@ -26,6 +26,7 @@ import { ModalityBadge } from "@/components/shared/modality-badge";
 import { TechBadge } from "@/components/shared/tech-badge";
 import { JobCard } from "@/components/shared/job-card";
 import { fetchJob, fetchJobs } from "@/lib/api";
+import { Badge } from "@/components/ui/badge";
 
 interface JobTechnology {
     id: number;
@@ -45,6 +46,7 @@ interface Job {
     description: string | null;
     technologies: JobTechnology[];
     source_id: number;
+    source_name: string;
     url_original: string;
 }
 
@@ -66,6 +68,12 @@ function formatDate(dateStr: string): string {
         month: "long",
         year: "numeric",
     });
+}
+
+function isNew(dateStr: string): boolean {
+    const date = new Date(dateStr);
+    const now = new Date();
+    return now.getTime() - date.getTime() < 1000 * 60 * 60 * 24;
 }
 
 export default function JobDetailPage() {
@@ -149,9 +157,11 @@ export default function JobDetailPage() {
             <div className="flex gap-8 items-start">
                 {/* Columna izquierda — contenido principal */}
                 <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap mb-3">
-                        {job.modality && <ModalityBadge modality={job.modality} />}
-                    </div>
+                    {isNew(job.scraped_at) && (
+                        <Badge className="bg-primary text-primary-foreground shadow-sm mb-3">
+                            Nuevo
+                        </Badge>
+                    )}
 
                     <h1 className="text-2xl sm:text-3xl font-semibold text-foreground leading-tight">
                         {job.title}
