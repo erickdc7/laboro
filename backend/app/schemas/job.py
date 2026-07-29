@@ -25,6 +25,7 @@ class JobBase(BaseModel):
 class JobResponse(JobBase):
     id: int
     source_id: int
+    source_name: str
     is_active: bool
     scraped_at: datetime
     published_at: Optional[datetime] = None

@@ -16,12 +16,20 @@ router = APIRouter(prefix="/jobs", tags=["jobs"])
 def get_jobs(
     page: int = 1,
     per_page: int = 20,
-    stack: Optional[str] = Query(None, description="Tecnología requerida (ej: react, python)"),
-    modality: Optional[str] = Query(None, description="Modalidad: remote, hybrid, on-site"),
+    stack: Optional[str] = Query(
+        None, description="Tecnología requerida (ej: react, python)"
+    ),
+    modality: Optional[str] = Query(
+        None, description="Modalidad: remote, hybrid, on-site"
+    ),
     city: Optional[str] = Query(None, description="Ciudad (ej: lima)"),
-    source: Optional[str] = Query(None, description="Portal de origen (ej: computrabajo)"),
-    search: Optional[str] = Query(None, description="Búsqueda por texto en título y descripción"),
-    db: Session = Depends(get_db)
+    source: Optional[str] = Query(
+        None, description="Portal de origen (ej: computrabajo)"
+    ),
+    search: Optional[str] = Query(
+        None, description="Búsqueda por texto en título y descripción"
+    ),
+    db: Session = Depends(get_db),
 ):
     query = db.query(Job).filter(Job.is_active == True)
 
@@ -37,16 +45,14 @@ def get_jobs(
         query = query.filter(Job.location.ilike(f"%{city}%"))
 
     if source:
-        query = query.join(Source).filter(
-            Source.name.ilike(f"%{source}%")
-        )
+        query = query.join(Source).filter(Source.name.ilike(f"%{source}%"))
 
     if search:
         query = query.filter(
             or_(
                 Job.title.ilike(f"%{search}%"),
                 Job.description.ilike(f"%{search}%"),
-                Job.company.ilike(f"%{search}%")
+                Job.company.ilike(f"%{search}%"),
             )
         )
 
@@ -54,29 +60,26 @@ def get_jobs(
 
     total = query.count()
     offset = (page - 1) * per_page
-    jobs = (
-        query
-        .order_by(Job.scraped_at.desc())
-        .offset(offset)
-        .limit(per_page)
-        .all()
-    )
+    jobs = query.order_by(Job.scraped_at.desc()).offset(offset).limit(per_page).all()
+
+    for job in jobs:
+        job.source_name = job.source.name
 
     return JobListResponse(
         data=jobs,
         total=total,
         page=page,
         per_page=per_page,
-        total_pages=math.ceil(total / per_page) if total > 0 else 0
+        total_pages=math.ceil(total / per_page) if total > 0 else 0,
     )
 
 
 @router.get("/{job_id}", response_model=JobResponse)
 def get_job(job_id: int, db: Session = Depends(get_db)):
-    job = db.query(Job).filter(
-        Job.id == job_id,
-        Job.is_active == True
-    ).first()
+    job = db.query(Job).filter(Job.id == job_id, Job.is_active == True).first()
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
+
+    job.source_name = job.source.name
+
     return job

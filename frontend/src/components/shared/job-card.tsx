@@ -21,17 +21,13 @@ interface Job {
     published_at: string | null;
     technologies: JobTechnology[];
     source_id: number;
+    source_name: string;
 }
 
 interface JobCardProps {
     job: Job;
     variant?: "row" | "grid";
 }
-
-const SOURCE_MAP: Record<number, "computrabajo" | "bumeran"> = {
-    1: "computrabajo",
-    2: "bumeran",
-};
 
 function timeAgo(dateStr: string): string {
     const date = new Date(dateStr);
@@ -53,7 +49,7 @@ function isNew(dateStr: string): boolean {
 }
 
 export function JobCard({ job, variant = "row" }: JobCardProps) {
-    const source = SOURCE_MAP[job.source_id];
+    const source = job.source_name?.toLowerCase() as "computrabajo" | "bumeran" | undefined;
 
     if (variant === "grid") {
         const visibleTechs = job.technologies.slice(0, 3);
