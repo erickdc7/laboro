@@ -93,13 +93,11 @@ export default function HomePage() {
 
             {/* Botones */}
             <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
-              <Button asChild size="lg" className="rounded-full">
-                <Link href="/jobs">
-                  Explorar empleos <ArrowRight className="size-4" />
-                </Link>
+              <Button size="lg" className="rounded-full" render={<Link href="/jobs" />}>
+                Explorar empleos <ArrowRight className="size-4" />
               </Button>
-              <Button asChild size="lg" variant="outline" className="rounded-full">
-                <Link href="/stats">Ver estadísticas</Link>
+              <Button size="lg" variant="outline" className="rounded-full" render={<Link href="/stats" />}>
+                Ver estadísticas
               </Button>
             </div>
 
@@ -219,10 +217,8 @@ export default function HomePage() {
                 <div className="grid size-14 place-items-center rounded-xl bg-emerald-500/15 text-emerald-400">
                   <TrendingUp className="size-7" />
                 </div>
-                <Button asChild variant="secondary">
-                  <Link href="/stats">
-                    Ver mercado <ArrowRight className="size-4" />
-                  </Link>
+                <Button variant="secondary" render={<Link href="/stats" />}>
+                  Ver mercado <ArrowRight className="size-4" />
                 </Button>
               </div>
             </div>
