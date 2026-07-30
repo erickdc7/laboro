@@ -26,6 +26,7 @@ interface Job {
   published_at: string | null;
   technologies: JobTechnology[];
   source_id: number;
+  source_name: string;
 }
 
 export default function HomePage() {
