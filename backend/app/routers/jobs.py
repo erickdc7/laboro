@@ -30,6 +30,9 @@ def get_jobs(
         None, description="Búsqueda por texto en título y descripción"
     ),
     sort: str = Query("recent", description="Orden: recent o salary"),
+    days: Optional[int] = Query(
+        None, description="Filtrar por antigüedad máxima en días (1, 3, 7)"
+    ),
     db: Session = Depends(get_db),
 ):
     query = db.query(Job).filter(Job.is_active == True)
@@ -56,6 +59,13 @@ def get_jobs(
                 Job.company.ilike(f"%{search}%"),
             )
         )
+
+    if days:
+        from datetime import datetime, timezone, timedelta
+        from sqlalchemy import func
+
+        cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+        query = query.filter(func.coalesce(Job.published_at, Job.scraped_at) >= cutoff)
 
     query = query.distinct()
 
