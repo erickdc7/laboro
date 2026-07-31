@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { ModalityBadge } from "./modality-badge";
 import { TechBadge } from "./tech-badge";
 import { SourceLogo } from "./source-logo";
+import { timeAgo, isNew } from "@/lib/time";
 
 interface JobTechnology {
     id: number;
@@ -27,25 +28,6 @@ interface Job {
 interface JobCardProps {
     job: Job;
     variant?: "row" | "grid";
-}
-
-function timeAgo(dateStr: string): string {
-    const date = new Date(dateStr);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-    const diffDays = Math.floor(diffHours / 24);
-
-    if (diffHours < 1) return "Hace menos de 1h";
-    if (diffHours < 24) return `Hace ${diffHours}h`;
-    if (diffDays === 1) return "Hace 1 día";
-    return `Hace ${diffDays} días`;
-}
-
-function isNew(dateStr: string): boolean {
-    const date = new Date(dateStr);
-    const now = new Date();
-    return now.getTime() - date.getTime() < 1000 * 60 * 60 * 24;
 }
 
 export function JobCard({ job, variant = "row" }: JobCardProps) {
