@@ -29,6 +29,7 @@ def get_jobs(
     search: Optional[str] = Query(
         None, description="Búsqueda por texto en título y descripción"
     ),
+    sort: str = Query("recent", description="Orden: recent o salary"),
     db: Session = Depends(get_db),
 ):
     query = db.query(Job).filter(Job.is_active == True)
@@ -60,7 +61,12 @@ def get_jobs(
 
     total = query.count()
     offset = (page - 1) * per_page
-    jobs = query.order_by(Job.scraped_at.desc()).offset(offset).limit(per_page).all()
+    if sort == "salary":
+        query = query.order_by(Job.salary_max.desc().nullslast(), Job.scraped_at.desc())
+    else:
+        query = query.order_by(Job.scraped_at.desc())
+
+    jobs = query.offset(offset).limit(per_page).all()
 
     for job in jobs:
         job.source_name = job.source.name
