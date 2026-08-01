@@ -28,6 +28,7 @@ import { JobCard } from "@/components/shared/job-card";
 import { fetchJob, fetchJobs } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
 import type { Job } from "@/types/job";
+import { isNew } from "@/lib/time";
 
 const SOURCE_LABELS: Record<number, { label: string; abbr: string; color: string }> = {
     1: { label: "Computrabajo", abbr: "CT", color: "#e65c1c" },
@@ -47,12 +48,6 @@ function formatDate(dateStr: string): string {
         month: "long",
         year: "numeric",
     });
-}
-
-function isNew(dateStr: string): boolean {
-    const date = new Date(dateStr);
-    const now = new Date();
-    return now.getTime() - date.getTime() < 1000 * 60 * 60 * 24;
 }
 
 export default function JobDetailPage() {
