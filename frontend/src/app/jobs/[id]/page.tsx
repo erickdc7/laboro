@@ -4,11 +4,11 @@ import { useParams, useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import {
     MapPin,
-    Banknote,
-    Calendar,
+    Wallet,
     Building2,
+    Calendar,
+    Radar,
     ExternalLink,
-    ArrowLeft,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -22,17 +22,17 @@ import {
     BreadcrumbPage,
     BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
-import { ModalityBadge } from "@/components/shared/modality-badge";
 import { TechBadge } from "@/components/shared/tech-badge";
+import { SourceLogo } from "@/components/shared/source-logo";
 import { JobCard } from "@/components/shared/job-card";
 import { fetchJob, fetchJobs } from "@/lib/api";
-import { Badge } from "@/components/ui/badge";
-import type { Job } from "@/types/job";
 import { isNew } from "@/lib/time";
+import type { Job } from "@/types/job";
 
-const SOURCE_LABELS: Record<number, { label: string; abbr: string; color: string }> = {
-    1: { label: "Computrabajo", abbr: "CT", color: "#e65c1c" },
-    2: { label: "Bumeran", abbr: "BU", color: "#5b21b6" },
+const MODALITY_LABELS: Record<string, string> = {
+    remote: "Remoto",
+    "on-site": "Presencial",
+    hybrid: "Híbrido",
 };
 
 function formatSalary(min: number | null, max: number | null): string | null {
@@ -44,10 +44,31 @@ function formatSalary(min: number | null, max: number | null): string | null {
 
 function formatDate(dateStr: string): string {
     return new Date(dateStr).toLocaleDateString("es-PE", {
-        day: "numeric",
+        day: "2-digit",
         month: "long",
         year: "numeric",
     });
+}
+
+function DataRow({
+    icon: Icon,
+    label,
+    children,
+}: {
+    icon: typeof MapPin;
+    label: string;
+    children: React.ReactNode;
+}) {
+    return (
+        <div className="flex items-center justify-between gap-4 py-3">
+            <span className="inline-flex items-center gap-2 text-sm text-muted-foreground">
+                <Icon className="size-4" /> {label}
+            </span>
+            <span className="text-right text-sm font-medium text-foreground">
+                {children}
+            </span>
+        </div>
+    );
 }
 
 export default function JobDetailPage() {
@@ -64,22 +85,22 @@ export default function JobDetailPage() {
         queryFn: () =>
             fetchJobs({
                 stack: job?.technologies[0]?.technology ?? "",
-                per_page: "3",
+                per_page: "4",
             }),
         enabled: !!job?.technologies[0]?.technology,
     });
 
     if (isLoading) {
         return (
-            <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8">
+            <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
                 <Skeleton className="h-6 w-48 mb-6" />
-                <div className="flex gap-8">
-                    <div className="flex-1 space-y-4">
+                <div className="grid grid-cols-1 gap-8 lg:grid-cols-[1fr_320px]">
+                    <div className="space-y-4">
                         <Skeleton className="h-10 w-3/4" />
                         <Skeleton className="h-6 w-1/2" />
                         <Skeleton className="h-64 w-full rounded-xl" />
                     </div>
-                    <Skeleton className="w-72 h-96 rounded-xl flex-shrink-0" />
+                    <Skeleton className="h-96 rounded-xl" />
                 </div>
             </div>
         );
@@ -87,11 +108,11 @@ export default function JobDetailPage() {
 
     if (!job) {
         return (
-            <div className="max-w-6xl mx-auto px-4 sm:px-6 py-24 text-center">
-                <h2 className="text-xl font-semibold text-foreground mb-2">
+            <div className="mx-auto max-w-6xl px-4 py-24 text-center sm:px-6">
+                <h2 className="mb-2 text-xl font-semibold text-foreground">
                     Empleo no encontrado
                 </h2>
-                <p className="text-muted-foreground mb-6">
+                <p className="mb-6 text-muted-foreground">
                     Este empleo ya no está disponible o fue eliminado.
                 </p>
                 <Button onClick={() => router.push("/jobs")}>
@@ -102,15 +123,16 @@ export default function JobDetailPage() {
     }
 
     const salary = formatSalary(job.salary_min, job.salary_max);
-    const source = SOURCE_LABELS[job.source_id];
-    const similarJobs = similarData?.data?.filter(
-        (j: Job) => j.id !== job.id
-    ).slice(0, 3) ?? [];
+    const sourceKey = job.source_name?.toLowerCase() as
+        | "computrabajo"
+        | "bumeran"
+        | undefined;
+    const similarJobs =
+        similarData?.data?.filter((j: Job) => j.id !== job.id).slice(0, 3) ?? [];
 
     return (
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8">
-            {/* Breadcrumb */}
-            <Breadcrumb className="mb-6">
+        <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
+            <Breadcrumb className="mb-5">
                 <BreadcrumbList>
                     <BreadcrumbItem>
                         <BreadcrumbLink href="/">Inicio</BreadcrumbLink>
@@ -121,35 +143,32 @@ export default function JobDetailPage() {
                     </BreadcrumbItem>
                     <BreadcrumbSeparator />
                     <BreadcrumbItem>
-                        <BreadcrumbPage className="truncate max-w-xs">
+                        <BreadcrumbPage className="max-w-[200px] truncate">
                             {job.title}
                         </BreadcrumbPage>
                     </BreadcrumbItem>
                 </BreadcrumbList>
             </Breadcrumb>
 
-            <div className="flex gap-8 items-start">
-                {/* Columna izquierda — contenido principal */}
-                <div className="flex-1 min-w-0">
+            <div className="mt-6 grid grid-cols-1 gap-8 lg:grid-cols-[1fr_320px]">
+                {/* Contenido principal */}
+                <div className="min-w-0">
                     {isNew(job.scraped_at) && (
-                        <Badge className="bg-primary text-primary-foreground shadow-sm mb-3">
+                        <span className="inline-block rounded-md bg-primary px-2 py-0.5 text-xs font-medium text-primary-foreground">
                             Nuevo
-                        </Badge>
+                        </span>
                     )}
-
-                    <h1 className="text-2xl sm:text-3xl font-semibold text-foreground leading-tight">
+                    <h1 className="mt-3 text-3xl font-semibold tracking-tight text-foreground">
                         {job.title}
                     </h1>
-
                     {job.company && (
-                        <p className="text-base text-muted-foreground mt-1">
+                        <p className="mt-1 text-base text-muted-foreground">
                             {job.company}
                         </p>
                     )}
 
-                    {/* Badges de tecnología */}
                     {job.technologies.length > 0 && (
-                        <div className="flex flex-wrap gap-1.5 mt-4">
+                        <div className="mt-5 flex flex-wrap gap-1.5">
                             {job.technologies.map((tech) => (
                                 <TechBadge key={tech.id} technology={tech.technology} />
                             ))}
@@ -158,147 +177,105 @@ export default function JobDetailPage() {
 
                     <Separator className="my-7" />
 
-                    {/* Descripción */}
-                    <div>
-                        <h2 className="text-lg font-semibold text-foreground mb-3">
-                            Descripción del puesto
-                        </h2>
-                        {job.description ? (
-                            <p className="text-sm text-foreground leading-relaxed whitespace-pre-line">
-                                {job.description}
+                    <h2 className="text-lg font-semibold text-foreground">
+                        Descripción del puesto
+                    </h2>
+                    {job.description ? (
+                        <p className="mt-3 whitespace-pre-line text-sm leading-relaxed text-muted-foreground">
+                            {job.description}
+                        </p>
+                    ) : (
+                        <div className="mt-3 rounded-xl border border-dashed border-border p-6 text-center">
+                            <p className="text-sm text-muted-foreground">
+                                La descripción completa está disponible en el portal de origen.
                             </p>
-                        ) : (
-                            <div className="rounded-xl border border-dashed border-border p-6 text-center">
-                                <p className="text-sm text-muted-foreground">
-                                    La descripción completa está disponible en el portal de
-                                    origen.
-                                </p>
-                                <a
-                                    href={job.url_original}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="text-sm text-primary hover:underline mt-2 inline-block"
-                                >
-                                    Ver oferta completa →
-                                </a>
-                            </div>
-                        )}
-                    </div>
-
-                    {/* Empleos similares */}
-                    {similarJobs.length > 0 && (
-                        <div className="mt-12">
-                            <Separator className="mb-7" />
-                            <h2 className="text-lg font-semibold text-foreground mb-4">
-                                Empleos similares
-                            </h2>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                                {similarJobs.map((similarJob: Job) => (
-                                    <JobCard key={similarJob.id} job={similarJob} variant="grid" />
-                                ))}
-                            </div>
+                            <a
+                                href={job.url_original}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="mt-2 inline-block text-sm text-primary hover:underline"
+                            >
+                                Ver oferta completa →
+                            </a>
                         </div>
                     )}
                 </div>
 
-                {/* Columna derecha — panel lateral */}
-                <div className="w-72 flex-shrink-0">
-                    <Card className="p-5 sticky top-20">
-                        <h3 className="text-sm font-semibold text-foreground mb-4">
-                            Detalles del empleo
+                {/* Panel lateral */}
+                <aside>
+                    <Card className="sticky top-20 gap-0 border-border p-5">
+                        <h3 className="text-sm font-semibold text-foreground">
+                            Datos del empleo
                         </h3>
-
-                        <div className="space-y-3">
+                        <div className="mt-2 divide-y divide-border">
                             {job.location && (
-                                <div className="flex items-start gap-2.5">
-                                    <MapPin className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
-                                    <div>
-                                        <p className="text-xs text-muted-foreground">Ubicación</p>
-                                        <p className="text-sm text-foreground">{job.location}</p>
-                                    </div>
-                                </div>
+                                <DataRow icon={MapPin} label="Ubicación">
+                                    {job.location}
+                                </DataRow>
                             )}
-
                             {job.modality && (
-                                <div className="flex items-start gap-2.5">
-                                    <Building2 className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
-                                    <div>
-                                        <p className="text-xs text-muted-foreground">Modalidad</p>
-                                        <ModalityBadge modality={job.modality} />
-                                    </div>
-                                </div>
+                                <DataRow icon={Building2} label="Modalidad">
+                                    {MODALITY_LABELS[job.modality] ?? job.modality}
+                                </DataRow>
                             )}
-
                             {salary && (
-                                <div className="flex items-start gap-2.5">
-                                    <Banknote className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
-                                    <div>
-                                        <p className="text-xs text-muted-foreground">Salario</p>
-                                        <p className="text-sm text-foreground font-medium">
-                                            {salary}
-                                        </p>
-                                    </div>
-                                </div>
+                                <DataRow icon={Wallet} label="Salario">
+                                    {salary}
+                                </DataRow>
                             )}
-
                             {job.company && (
-                                <div className="flex items-start gap-2.5">
-                                    <Building2 className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
-                                    <div>
-                                        <p className="text-xs text-muted-foreground">Empresa</p>
-                                        <p className="text-sm text-foreground">{job.company}</p>
-                                    </div>
-                                </div>
+                                <DataRow icon={Building2} label="Empresa">
+                                    {job.company}
+                                </DataRow>
                             )}
-
-                            <div className="flex items-start gap-2.5">
-                                <Calendar className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
-                                <div>
-                                    <p className="text-xs text-muted-foreground">Publicado</p>
-                                    <p className="text-sm text-foreground">
-                                        {formatDate(job.scraped_at)}
-                                    </p>
-                                </div>
-                            </div>
-
-                            {source && (
-                                <div className="flex items-start gap-2.5">
-                                    <span
-                                        className="w-4 h-4 rounded-sm flex items-center justify-center text-white font-mono font-bold text-xs flex-shrink-0 mt-0.5"
-                                        style={{ backgroundColor: source.color }}
-                                    >
-                                        {source.abbr}
+                            <DataRow icon={Calendar} label="Publicado">
+                                {formatDate(job.scraped_at)}
+                            </DataRow>
+                            {sourceKey && (
+                                <div className="flex items-center justify-between gap-4 py-3">
+                                    <span className="inline-flex items-center gap-2 text-sm text-muted-foreground">
+                                        <Radar className="size-4" /> Fuente
                                     </span>
-                                    <div>
-                                        <p className="text-xs text-muted-foreground">Fuente</p>
-                                        <p className="text-sm text-foreground">{source.label}</p>
-                                    </div>
+                                    <SourceLogo source={sourceKey} />
                                 </div>
                             )}
                         </div>
 
-                        <Separator className="my-4" />
-
-                        <a
-                            href={job.url_original}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="w-full inline-flex items-center justify-center gap-2 px-4 py-2 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors"
+                        <Button
+                            className="mt-4 w-full"
+                            size="lg"
+                            render={
+                                <a
+                                    href={job.url_original}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                />
+                            }
                         >
-                            Ver oferta original
-                            <ExternalLink className="w-4 h-4" />
-                        </a>
-
-                        <button
-                            onClick={() => router.back()}
-                            className="w-full mt-2 inline-flex items-center justify-center gap-2 px-4 py-2 rounded-md border border-border text-sm text-muted-foreground hover:bg-secondary transition-colors"
-                        >
-                            <ArrowLeft className="w-4 h-4" />
-                            Volver a empleos
-                        </button>
+                            Ver oferta original <ExternalLink className="size-4" />
+                        </Button>
+                        {job.source_name && (
+                            <p className="mt-2 text-center text-xs text-muted-foreground">
+                                Serás redirigido a {job.source_name}
+                            </p>
+                        )}
                     </Card>
-                </div>
+                </aside>
             </div>
+
+            {/* Empleos similares — ancho completo */}
+            {similarJobs.length > 0 && (
+                <section className="mt-14">
+                    <h2 className="text-xl font-semibold tracking-tight text-foreground">
+                        Empleos similares
+                    </h2>
+                    <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                        {similarJobs.map((similarJob: Job) => (
+                            <JobCard key={similarJob.id} job={similarJob} variant="grid" />
+                        ))}
+                    </div>
+                </section>
+            )}
         </div>
     );
 }
