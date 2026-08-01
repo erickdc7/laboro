@@ -35,24 +35,7 @@ import {
 } from "@/components/shared/filters-panel";
 import { JobCard } from "@/components/shared/job-card";
 import { fetchJobs } from "@/lib/api";
-
-interface JobTechnology {
-    id: number;
-    technology: string;
-}
-
-interface Job {
-    id: number;
-    title: string;
-    company: string | null;
-    location: string | null;
-    modality: string | null;
-    scraped_at: string;
-    published_at: string | null;
-    technologies: JobTechnology[];
-    source_id: number;
-    source_name: string;
-}
+import type { Job } from "@/types/job";
 
 interface JobsResponse {
     data: Job[];

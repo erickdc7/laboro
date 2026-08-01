@@ -6,24 +6,7 @@ import { ModalityBadge } from "./modality-badge";
 import { TechBadge } from "./tech-badge";
 import { SourceLogo } from "./source-logo";
 import { timeAgo, isNew } from "@/lib/time";
-
-interface JobTechnology {
-    id: number;
-    technology: string;
-}
-
-interface Job {
-    id: number;
-    title: string;
-    company: string | null;
-    location: string | null;
-    modality: string | null;
-    scraped_at: string;
-    published_at: string | null;
-    technologies: JobTechnology[];
-    source_id: number;
-    source_name: string;
-}
+import type { Job } from "@/types/job";
 
 interface JobCardProps {
     job: Job;

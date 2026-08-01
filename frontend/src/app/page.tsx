@@ -16,26 +16,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { StatCard } from "@/components/shared/stat-card";
 import { JobCard } from "@/components/shared/job-card";
 import { fetchSummary, fetchJobs } from "@/lib/api";
-
-interface JobTechnology {
-  id: number;
-  technology: string;
-}
-
-interface Job {
-  id: number;
-  title: string;
-  company: string | null;
-  location: string | null;
-  modality: string | null;
-  salary_min: number | null;
-  salary_max: number | null;
-  scraped_at: string;
-  published_at: string | null;
-  technologies: JobTechnology[];
-  source_id: number;
-  source_name: string;
-}
+import type { Job } from "@/types/job";
 
 const FINE_PRINT = ["Actualizado a diario", "Sin registro", "100% gratis"];
 

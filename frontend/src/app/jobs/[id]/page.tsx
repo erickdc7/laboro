@@ -27,28 +27,7 @@ import { TechBadge } from "@/components/shared/tech-badge";
 import { JobCard } from "@/components/shared/job-card";
 import { fetchJob, fetchJobs } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
-
-interface JobTechnology {
-    id: number;
-    technology: string;
-}
-
-interface Job {
-    id: number;
-    title: string;
-    company: string | null;
-    location: string | null;
-    modality: string | null;
-    salary_min: number | null;
-    salary_max: number | null;
-    scraped_at: string;
-    published_at: string | null;
-    description: string | null;
-    technologies: JobTechnology[];
-    source_id: number;
-    source_name: string;
-    url_original: string;
-}
+import type { Job } from "@/types/job";
 
 const SOURCE_LABELS: Record<number, { label: string; abbr: string; color: string }> = {
     1: { label: "Computrabajo", abbr: "CT", color: "#e65c1c" },
