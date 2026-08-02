@@ -58,7 +58,7 @@ function PaginationLink({
           variant: isActive ? "outline" : "ghost",
           size,
         }),
-        isActive && "border-foreground/25! bg-card! shadow-sm!",
+        isActive && "bg-card shadow-sm",
         className
       )}
       {...props}
