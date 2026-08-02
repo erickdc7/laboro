@@ -223,34 +223,37 @@ export function JobsPageContent() {
                             <PaginationContent>
                                 <PaginationItem>
                                     <PaginationPrevious
-                                        onClick={() => goToPage(Math.max(1, page - 1))}
-                                        className={
-                                            page <= 1
-                                                ? "pointer-events-none opacity-50"
-                                                : "cursor-pointer"
-                                        }
+                                        href="#"
+                                        onClick={(e) => {
+                                            e.preventDefault();
+                                            goToPage(Math.max(1, page - 1));
+                                        }}
+                                        className={page <= 1 ? "pointer-events-none opacity-50" : undefined}
                                     />
                                 </PaginationItem>
-                                {Array.from({ length: data.total_pages }, (_, i) => i + 1).map(
-                                    (n) => (
-                                        <PaginationItem key={n}>
-                                            <PaginationLink
-                                                isActive={n === page}
-                                                onClick={() => goToPage(n)}
-                                                className="cursor-pointer"
-                                            >
-                                                {n}
-                                            </PaginationLink>
-                                        </PaginationItem>
-                                    )
-                                )}
+                                {Array.from({ length: data.total_pages }, (_, i) => i + 1).map((n) => (
+                                    <PaginationItem key={n}>
+                                        <PaginationLink
+                                            href="#"
+                                            isActive={n === page}
+                                            onClick={(e) => {
+                                                e.preventDefault();
+                                                goToPage(n);
+                                            }}
+                                        >
+                                            {n}
+                                        </PaginationLink>
+                                    </PaginationItem>
+                                ))}
                                 <PaginationItem>
                                     <PaginationNext
-                                        onClick={() => goToPage(Math.min(data.total_pages, page + 1))}
+                                        href="#"
+                                        onClick={(e) => {
+                                            e.preventDefault();
+                                            goToPage(Math.min(data.total_pages, page + 1));
+                                        }}
                                         className={
-                                            page >= data.total_pages
-                                                ? "pointer-events-none opacity-50"
-                                                : "cursor-pointer"
+                                            page >= data.total_pages ? "pointer-events-none opacity-50" : undefined
                                         }
                                     />
                                 </PaginationItem>
