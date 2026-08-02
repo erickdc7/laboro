@@ -59,6 +59,7 @@ function PaginationLink({
           size,
         }),
         isActive && "bg-card shadow-sm",
+        "active:translate-y-0! hover:bg-muted! hover:text-foreground!",
         className
       )}
       {...props}
