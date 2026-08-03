@@ -58,8 +58,9 @@ function PaginationLink({
           variant: isActive ? "outline" : "ghost",
           size,
         }),
-        isActive && "bg-card shadow-sm",
-        "active:translate-y-0! hover:bg-muted! hover:text-foreground!",
+        size === "icon" && "size-9! rounded-md!",
+        !isActive && "border-transparent!",
+        "active:translate-y-0! hover:bg-accent! hover:text-accent-foreground!",
         className
       )}
       {...props}
