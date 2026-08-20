@@ -18,13 +18,6 @@ jobs:
             --fail \
             --show-error
 
-      - name: Scraper de Bumeran
-        run: |
-          curl -X POST "https://laboro-backend.onrender.com/scraper/run?source_name=bumeran" \
-            --max-time 600 \
-            --fail \
-            --show-error
-
       - name: Expirar empleos con más de 7 días
         run: |
           curl -X POST "https://laboro-backend.onrender.com/scraper/expire" \
