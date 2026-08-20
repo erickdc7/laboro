@@ -23,7 +23,7 @@ class BaseScraper(ABC):
             "jobs_new": 0,
             "jobs_updated": 0,
             "status": "success",
-            "error_message": None
+            "error_message": None,
         }
         try:
             raw_jobs = self.fetch_jobs()
@@ -39,8 +39,11 @@ class BaseScraper(ABC):
                     results["jobs_updated"] += 1
 
         except Exception as e:
+            error_text = str(e)
             results["status"] = "error"
-            results["error_message"] = str(e)
+            results["error_message"] = (
+                error_text[:497] + "..." if len(error_text) > 500 else error_text
+            )
             print(f"[{self.__class__.__name__}] Error: {e}")
 
         print(f"[{self.__class__.__name__}] Finalizado — {results}")
@@ -49,9 +52,11 @@ class BaseScraper(ABC):
     def _save_job(self, job_data: dict) -> str:
         from app.models.job import Job, JobTechnology
 
-        existing = self.db.query(Job).filter(
-            Job.url_original == job_data["url_original"]
-        ).first()
+        existing = (
+            self.db.query(Job)
+            .filter(Job.url_original == job_data["url_original"])
+            .first()
+        )
 
         if existing:
             return "skipped"

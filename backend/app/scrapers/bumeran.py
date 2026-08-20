@@ -1,3 +1,4 @@
+import os
 import time
 import random
 from bs4 import BeautifulSoup
@@ -20,6 +21,8 @@ SEARCH_URLS = [
     "https://www.bumeran.com.pe/empleos-busqueda-python.html",
 ]
 
+CHROME_BIN_PATH = "/opt/render/project/.render/chrome/opt/google/chrome/google-chrome"
+
 
 def get_driver():
     options = Options()
@@ -36,6 +39,9 @@ def get_driver():
     options.add_argument("--disable-blink-features=AutomationControlled")
     options.add_experimental_option("excludeSwitches", ["enable-automation"])
     options.add_experimental_option("useAutomationExtension", False)
+
+    if os.path.exists(CHROME_BIN_PATH):
+        options.binary_location = CHROME_BIN_PATH
 
     service = Service(ChromeDriverManager().install())
     driver = webdriver.Chrome(service=service, options=options)
