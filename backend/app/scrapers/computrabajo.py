@@ -2,10 +2,15 @@ import requests
 import time
 import random
 from bs4 import BeautifulSoup
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 
 from app.scrapers.base import BaseScraper
-from app.scrapers.utils import clean_text, extract_technologies, parse_salary
+from app.scrapers.utils import (
+    clean_text,
+    extract_technologies,
+    parse_salary,
+    parse_relative_date,
+)
 
 HEADERS = {
     "User-Agent": (
@@ -24,36 +29,6 @@ SEARCH_URLS = [
     "https://pe.computrabajo.com/trabajo-de-react",
     "https://pe.computrabajo.com/trabajo-de-python",
 ]
-
-
-def parse_relative_date(text: str) -> datetime:
-    text = text.lower().strip()
-    now = datetime.now(timezone.utc)
-
-    if "min" in text:
-        nums = [int(s) for s in text.split() if s.isdigit()]
-        minutes = nums[0] if nums else 30
-        return now - timedelta(minutes=minutes)
-    elif "hora" in text:
-        nums = [int(s) for s in text.split() if s.isdigit()]
-        hours = nums[0] if nums else 1
-        return now - timedelta(hours=hours)
-    elif "ayer" in text:
-        return now - timedelta(days=1)
-    elif "día" in text or "dia" in text:
-        nums = [int(s) for s in text.split() if s.isdigit()]
-        days = nums[0] if nums else 2
-        return now - timedelta(days=days)
-    elif "semana" in text:
-        nums = [int(s) for s in text.split() if s.isdigit()]
-        weeks = nums[0] if nums else 1
-        return now - timedelta(weeks=weeks)
-    elif "mes" in text:
-        nums = [int(s) for s in text.split() if s.isdigit()]
-        months = nums[0] if nums else 1
-        return now - timedelta(days=months * 30)
-    else:
-        return now
 
 
 class ComputrabajoScraper(BaseScraper):

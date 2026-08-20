@@ -11,14 +11,13 @@ from selenium.webdriver.support import expected_conditions as EC
 from webdriver_manager.chrome import ChromeDriverManager
 
 from app.scrapers.base import BaseScraper
-from app.scrapers.utils import clean_text, extract_technologies, parse_salary
-
+from app.scrapers.utils import clean_text, extract_technologies, parse_relative_date
 
 SEARCH_URLS = [
-    "https://www.bumeran.com.pe/empleos-desarrollador-software.html",
-    "https://www.bumeran.com.pe/empleos-programador.html",
-    "https://www.bumeran.com.pe/empleos-react.html",
-    "https://www.bumeran.com.pe/empleos-python.html",
+    "https://www.bumeran.com.pe/empleos-busqueda-programador.html",
+    "https://www.bumeran.com.pe/empleos-busqueda-fullstack.html",
+    "https://www.bumeran.com.pe/empleos-busqueda-react.html",
+    "https://www.bumeran.com.pe/empleos-busqueda-python.html",
 ]
 
 
@@ -77,9 +76,7 @@ class BumeranScraper(BaseScraper):
 
         try:
             WebDriverWait(driver, 15).until(
-                EC.presence_of_element_located(
-                    (By.CSS_SELECTOR, "[class*='job'], [class*='aviso'], article")
-                )
+                EC.presence_of_element_located((By.TAG_NAME, "h2"))
             )
         except Exception:
             print(f"[Bumeran] Timeout esperando contenido en {url}")
@@ -88,11 +85,11 @@ class BumeranScraper(BaseScraper):
         html = driver.page_source
         soup = BeautifulSoup(html, "lxml")
 
-        job_cards = (
-            soup.find_all("div", class_=lambda c: c and "aviso" in c.lower()) or
-            soup.find_all("article") or
-            soup.find_all("div", class_=lambda c: c and "job" in c.lower())
+        job_cards = soup.find_all(
+            "a",
+            href=lambda h: h and h.startswith("/empleos/") and h.endswith(".html"),
         )
+        print(f"[Bumeran] Cards encontrados: {len(job_cards)}")
 
         jobs = []
         for card in job_cards:
@@ -107,69 +104,66 @@ class BumeranScraper(BaseScraper):
         return jobs
 
     def _extract_card_data(self, card) -> dict | None:
-        title_tag = (
-            card.find("h2") or
-            card.find("h3") or
-            card.find("a", class_=lambda c: c and "titulo" in c.lower())
-        )
+        title_tag = card.find("h2")
         if not title_tag:
             return None
 
         title = clean_text(title_tag.get_text())
-        if not title or len(title) < 5:
+        if not title:
             return None
 
-        link_tag = card.find("a", href=True)
-        if not link_tag:
+        href = card.get("href")
+        if not href:
             return None
-
-        href = link_tag["href"]
         if not href.startswith("http"):
             href = f"https://www.bumeran.com.pe{href}"
 
-        company_tag = (
-            card.find("span", class_=lambda c: c and "empresa" in c.lower()) or
-            card.find("p", class_=lambda c: c and "empresa" in c.lower()) or
-            card.find("a", class_=lambda c: c and "empresa" in c.lower())
-        )
-        company = clean_text(company_tag.get_text()) if company_tag else None
+        h3_tags = card.find_all("h3")
+        published_at = None
+        company = None
+        if len(h3_tags) >= 1:
+            published_at = parse_relative_date(clean_text(h3_tags[0].get_text()))
+        if len(h3_tags) >= 2:
+            company = clean_text(h3_tags[1].get_text())
 
-        location_tag = (
-            card.find("span", class_=lambda c: c and "localidad" in c.lower()) or
-            card.find("span", class_=lambda c: c and "ubicacion" in c.lower()) or
-            card.find("p", class_=lambda c: c and "lugar" in c.lower())
-        )
-        location = clean_text(location_tag.get_text()) if location_tag else "Lima"
+        location = None
+        location_icon = card.find("i", attrs={"aria-label": "Ubicación"})
+        if location_icon:
+            loc_h3 = location_icon.find_next("h3")
+            if loc_h3:
+                location = clean_text(loc_h3.get_text())
 
-        salary_tag = card.find(
-            class_=lambda c: c and ("salario" in c.lower() or "sueldo" in c.lower())
-        )
-        salary_text = clean_text(salary_tag.get_text()) if salary_tag else ""
-        salary_min, salary_max = parse_salary(salary_text)
+        modality = "on-site"
+        modality_icon = card.find("i", attrs={"aria-label": "Modalidad"})
+        if modality_icon:
+            mod_h3 = modality_icon.find_next("h3")
+            if mod_h3:
+                modality_text = clean_text(mod_h3.get_text()).lower()
+                if "remoto" in modality_text:
+                    modality = "remote"
+                elif "hibrid" in modality_text:
+                    modality = "hybrid"
 
-        description_text = f"{title} {company or ''}"
-        technologies = extract_technologies(description_text)
+        description = None
+        desc_p = card.find("p")
+        if desc_p:
+            description = clean_text(desc_p.get_text())
+
+        tech_text = f"{title} {description or ''}"
+        technologies = extract_technologies(tech_text)
 
         return {
             "title": title,
             "company": company,
-            "description": None,
+            "description": description,
             "location": location,
-            "modality": self._detect_modality(card),
-            "salary_min": salary_min,
-            "salary_max": salary_max,
+            "modality": modality,
+            "salary_min": None,
+            "salary_max": None,
             "url_original": href,
-            "published_at": datetime.now(timezone.utc),
+            "published_at": published_at or datetime.now(timezone.utc),
             "technologies": technologies,
         }
-
-    def _detect_modality(self, card) -> str:
-        text = card.get_text().lower()
-        if "remoto" in text or "remote" in text or "teletrabajo" in text:
-            return "remote"
-        elif "híbrido" in text or "hibrido" in text or "hybrid" in text:
-            return "hybrid"
-        return "on-site"
 
     def parse_job(self, raw_data: dict) -> dict:
         return raw_data
