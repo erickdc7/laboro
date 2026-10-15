@@ -5,8 +5,9 @@ from app.database import get_db
 from app.models.source import Source
 from app.models.scrape_log import ScrapeLog
 from app.scrapers.computrabajo import ComputrabajoScraper
-from app.scrapers.bumeran import BumeranScraper
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
+from sqlalchemy import func
+from app.models.job import Job
 
 router = APIRouter(prefix="/scraper", tags=["scraper"])
 
@@ -33,7 +34,6 @@ def run_scraper(source_name: str = "computrabajo", db: Session = Depends(get_db)
 
     scrapers = {
         "computrabajo": ComputrabajoScraper,
-        "bumeran": BumeranScraper,
     }
 
     scraper_class = scrapers.get(source_name.lower())
@@ -83,9 +83,22 @@ def get_scrape_logs(limit: int = 20, db: Session = Depends(get_db)):
     ]
 
 
+def expire_old_jobs(db: Session) -> int:
+    cutoff = datetime.now(timezone.utc) - timedelta(days=7)
+    expired = (
+        db.query(Job)
+        .filter(
+            Job.is_active == True,
+            func.coalesce(Job.published_at, Job.scraped_at) < cutoff,
+        )
+        .update({"is_active": False}, synchronize_session=False)
+    )
+    db.commit()
+    print(f"[Expiración] {expired} empleos marcados como inactivos (>7 días)")
+    return expired
+
+
 @router.post("/expire")
 def expire_jobs_manually(db: Session = Depends(get_db)):
-    from app.scheduler import expire_old_jobs
-
     count = expire_old_jobs(db)
     return {"expired": count}
